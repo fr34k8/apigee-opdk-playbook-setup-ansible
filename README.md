@@ -1,69 +1,102 @@
-# Apigee Private Cloud Accelerator
+> Ansible playbook framework for automating the full lifecycle of Apigee Edge Private Cloud (OPDK) — from OS prerequisites and controller setup through multi-node planet installation, expansion, upgrade, and disaster recovery.
 
-## Introduction
-This repository contains a set of Ansible roles and playbooks to manage the installation, 
-configuration and maintenance of Private Cloud across multiple environments. These playbooks 
-will ensure that Apigee requirements are met regarding the 
-configuration of the operating system, the bootstrap configuration and the installation of 
-components. The operating system prerequisites are managed with the option to defer management of 
-specific items. The bootstrap configuration is managed whether you do an online installation or 
-exercise one of the two offline installation options. Component installation is managed so that all 
-configuration files are generated to the topology indicated and role of the individual node. These 
-playbooks create a central location from where to manage Private Cloud installations.
+> [!NOTE]
+> For expertise demonstrated, capabilities analysis, and related projects, see [SKILLS-ASSESSMENT.md](./SKILLS-ASSESSMENT.md).
 
-# Ansible Private Cloud Accelerator Features
-The Ansible playbooks in this repository support a wide range of the installation, configuration
-and maintenance use cases that are necessary to successfully manage Apigee Private Cloud Planets.
-We describe the uses cases that are supported as follows: 
+## What the playbook actually does
 
-| Feature Name | Feature Description |
-| --- | --- |
-| Planet Installation | A Private Cloud installation of a Planet containing any number of nodes that follow our recommended HA topologies. |
-| Planet Expansion | A Private Cloud Planet can be expanded to either increase the size of the Cassandra Ring, increase transaction capacity with additional Routers and Message Processors or expand the Planet with up to 9 additional regions. |
-| Disaster Recovery | These playbooks enable automated disaster recovery scenarios. These playbooks currently operate on Apigee components to remove, re-install, re-configured, scale up or scale down a Planet thereby providing the necessary functionality to drastically reduce the time to recover from a disaster. |
-| Planet Maintenance | These playbooks are constructed by composing functionality into Ansible modules called roles to achieve specific use cases. This approach has enabled this framework to re-use the roles that are combined in new ways to provide automation support to the maintenance activities that the Apigee platform requires.  |
-| Planet Upgrade | The playbooks included in this repository will perform Apigee platform upgrades. |
+This repository is the top-level orchestrator for the `apigee-opdk-*` Ansible role ecosystem. It composes ~30+ Galaxy roles into runnable playbooks that cover every phase of an Apigee Private Cloud deployment:
 
-## Assumptions 
-* This repository assumes that no [Apigee Operating System requirements](https://docs.apigee.com/release/supported-software#apigeeedgeforprivatecloudsupportedversions) 
-have been fulfilled except to select the basic operating system that is supported. 
-* A [control server](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html#control-machine-requirements) 
-is available from which [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) 
-scripts and modules can be downloaded.
-* We assume that you have an introductory understanding of [Ansible](https://docs.ansible.com/) and 
-[Ansible Galaxy](https://galaxy.ansible.com/docs/).
-* Availability of administrative privilege escalation on the control server and the target nodes.
-* Ansible version 2.7.7. 
+1. **Controller setup** (`setup/`) — Bootstraps the Ansible control node: installs Galaxy role dependencies, creates the `~/.ansible`, `~/.apigee`, `~/.apigee-secure`, and `~/.apigee-workspace` directory conventions, and configures `ansible.cfg` with inventory and SSH defaults.
 
-## Quick Start: Usage Overview
-The use of this framework is composed of the following steps:
+2. **Infrastructure** (`infrastructure/`) — Prepares target environments:
+   - **SSH access** — Configure key-based SSH login and bastion host proxy commands.
+   - **Offline / air-gapped installs** — Mirror creation (`mirror/`), offline package download, and offline Ansible controller setup.
+   - **Response file generation** — Dynamically generate Apigee silent-installation config files from host properties.
+   - **Port validation** — Verify required ports are open across the planet.
+   - **GCE provisioning** — Terraform modules and Ansible playbooks for spinning up Apigee topologies on Google Compute Engine (AIO, 5-node, multi-data-center).
+   - **Backup** — Back up and restore the Ansible controller configuration.
 
-1. Install git, rsync, tree and pip. Assuming you are 
+3. **Installations** (`installations/`) — Deploy Apigee components by topology:
+   - **AIO** — All-in-one single-node installation.
+   - **Multi-node / multi-region** — Full HA planet installation with tagged plays for OS prep (`os`), bootstrap, Cassandra/ZooKeeper (`ds`), Management Server (`ms`), Router (`r`), Message Processor (`mp`), Qpid (`qpid`), Postgres master/standby (`pg`/`pgmaster`/`pgstandby`), and org onboarding (`org`).
+   - **Edge Microgateway** — Microgateway-specific installation.
+   - **Developer Portal** — Drupal-based portal installation.
+   - Every installation supports `--tags` for partial execution (e.g., `--tags=os` for OS-only, `--tags=ds` for data-store only).
 
+4. **Post-installation** (`post-installation/`) — Ongoing operations:
+   - **Add components** — Scale routers, message processors, Postgres standbys.
+   - **Remove components** — Decommission analytics, Cassandra, routers, message processors, ZooKeeper, entire environments, pods, or virtual hosts.
+   - **Expand regions** — Add data centers to an existing planet.
+   - **Upgrade** — In-place Apigee version upgrades.
+   - **Backup & restore** — Component-level backup and restore.
+   - **Cassandra rebuild** — Rebuild dead or replaced Cassandra nodes.
+   - **Validations** — Smoke-test Cassandra, ZooKeeper, LDAP, Qpid, Router+MP, and analytics.
+   - **Operational** — Download logs, restart components, debug mode, user management, monetization setup, virtual host management, analytics scope updates.
 
-    sudo yum install -y git, rsync, tree, python-pip
-    sudo pip install ansible google-auth
+## Architecture
 
-1. Clone this repository to `~/apigee-opdk-accelerator`.
+```
+setup/                          # Ansible controller bootstrap
+  setup.yml                       → apigee-opdk-setup-ansible-controller
+  requirements.yml                → pulls Galaxy roles
+infrastructure/                 # Environment preparation
+  configure-ssh-login/
+  ssh-bastion-host/
+  ssh-tunnels/
+  mirror/                          → apigee-opdk-setup-mirror-nginx + offline workflows
+  download-offline-packages/
+  setup-ansible-offline/
+  response-file-generator/
+  port-requirements/
+  gce-management/                  → Terraform + Ansible for GCE
+  backup-ansible-controller/
+  clean-ansible/
+  bastion-host-proxy/              → nginx + Let's Encrypt
+installations/                  # Planet deployment
+  aio/                             → single-node install
+  multi-node/                      → HA planet (single or multi-region)
+  devportal/                       → Drupal portal
+  edge-microgateway/
+post-installation/              # Lifecycle operations
+  add/  remove/  upgrade/  backup/
+  expand-planet-regions/  cassandra-rebuild/
+  validations/  debug-mode/  ...
+```
 
+Roles are consumed via `ansible-galaxy install -r requirements.yml` and composed into multi-play playbooks. Property files in `~/.apigee/` and `~/.apigee-secure/` drive per-environment configuration.
 
-    git clone git@github.com:apigee/ansible-opdk-accelerator.git ~/apigee-opdk-accelerator
-    
-1. [Setup](setup#usage-instructions) an Ansible control server and workspace.
-1. Configure [Ansible and the Ansible inventory](README-ansible-configuration.md).
-1. Please update [credentials](README-credentials.md) and license.  
-1. Please review and update the runtime [attributes](README-runtime-attributes.md) as needed. Update common installation 
-attributes like `opdk_version` that is stored in `~/.apigee/custom-properties.yml`.
-1. Use `ansible-playbook` to carry out an activity from either the [installations](installations), [infrastructure](infrastructure) or [post-installation](post-installation) folders.
+## Usage
 
-<!-- BEGIN Google How To Contribute -->
-# How to Contribute
+```bash
+# 1. Set up the Ansible controller
+cd setup/
+ansible-galaxy install -r requirements.yml -f
+ansible-playbook setup.yml
 
-We'd love to accept your patches and contributions to this project. Please review our [guidelines](CONTRIBUTING.md).
-<!-- END Google How To Contribute -->
+# 2. Configure inventory and credentials (see README-ansible-configuration.md, README-credentials.md)
+
+# 3. Install a planet (example: multi-node)
+cd installations/multi-node/
+ansible-galaxy install -r requirements.yml -f
+ansible-playbook install.yml
+
+# 4. Run a subset (OS prerequisites only)
+ansible-playbook install.yml --tags=os
+
+# 5. Post-install: validate Cassandra
+cd post-installation/validations/cassandra/
+ansible-playbook validate.yml
+```
+
+## Provenance
+
+Originally authored by Carlos Frias during tenure on the Apigee Edge Private Cloud team at Google. Forked from the `apigee/ansible-opdk-accelerator` open-source release and extended with additional infrastructure, offline, GCE, and operational playbooks.
+
 <!-- BEGIN Google Required Disclaimer -->
-
-# Not Google Product Clause
-
 This is not an officially supported Google product.
 <!-- END Google Required Disclaimer -->
+
+## License
+
+Apache License 2.0 — see [LICENSE](./LICENSE).
