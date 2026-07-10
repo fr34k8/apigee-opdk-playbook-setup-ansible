@@ -6,6 +6,8 @@
 ## What the playbook actually does
 
 This repository is the top-level orchestrator for the `apigee-opdk-*` Ansible role ecosystem. It composes ~30+ Galaxy roles into runnable playbooks that cover every phase of an Apigee Private Cloud deployment:
+> [!NOTE]
+> Engineering portfolio note — this project demonstrates Apigee OPDK lifecycle orchestration. See the [skills assessment →](SKILLS-ASSESSMENT.md) for the expertise applied.
 
 1. **Controller setup** (`setup/`) — Bootstraps the Ansible control node: installs Galaxy role dependencies, creates the `~/.ansible`, `~/.apigee`, `~/.apigee-secure`, and `~/.apigee-workspace` directory conventions, and configures `ansible.cfg` with inventory and SSH defaults.
 
