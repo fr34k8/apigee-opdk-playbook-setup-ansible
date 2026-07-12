@@ -5,6 +5,9 @@
 
 ## What the playbook actually does
 
+> 🔄 **Evolution note:** The automation approach from this OPDK-era role has been consolidated into the `apigee-hybrid-workspace` Ansible collection. See the successor capability in the portfolio hub: [`carlosfrias/apigee-hybrid-workspace`](https://github.com/carlosfrias/apigee-hybrid-workspace) → `bap_coe/private_cloud/` and `bap_coe/apigee_hybrid/`. The collection README explains each role group’s business value and production context.
+
+
 This repository is the top-level orchestrator for the `apigee-opdk-*` Ansible role ecosystem. It composes ~30+ Galaxy roles into runnable playbooks that cover every phase of an Apigee Private Cloud deployment:
 > [!NOTE]
 > Engineering portfolio note — this project demonstrates Apigee OPDK lifecycle orchestration. See the [skills assessment →](SKILLS-ASSESSMENT.md) for the expertise applied.
